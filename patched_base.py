@@ -2,55 +2,7 @@ import load_data
 import numpy as np
 import cv2
 
-def context_aware_patch_selection(img, target, adaptive):
-    '''
-        Returns patch selection
 
-        :param img: input image. MxNx3 => 200x200x3
-        :param target: region to be filled. T/F matrix of size MxN. 
-            img[target] returns the region to be filled.
-        :param adaptive: T/F. True if adaptive partitioning will be used. 
-            else simple partitioning
-        :returns: patches
-            patches: a list of most contextually similar blocks?
-                    I think a list bc greedy wants 1, multiple candidate wants to combine them all
-    '''
-    if adaptive:
-        # Adaptive sized block partitions
-        pass
-    else:
-        # Fixed sized block partitions
-        return fixed_sized_patch_selection(img, target)
-
-
-def fixed_sized_patch_selection(img, target, block_size=5):
-    '''
-        Returns patch selection
-
-        :param img: input image. MxNx3 => 200x200x3
-        :param target: region to be filled. T/F matrix of size MxN. 
-            img[target] returns the region to be filled.
-        :param block_size: (optional) size of patch squares. 
-                    Should be perfect multiple of img dimensions. Should also be odd.
-        :return: (patches, block_size)
-            patches: a list of locations for contextually similar patches. 
-                All patches are of block_sizexblock_size. Location is center of block
-                For example: [(10,10), ....., (150, 150)]
-            block_size: the size of each patch. Necessary to retrieve source patch via patch location.
-                loc_col, loc_row = patches[0]
-                img[loc_col-block_size:loc_col+block_size, loc_row-block_size:loc_row+block_size] := patch 0
-    '''
-    d = img.shape[0]  # 200
-
-    context_descriptors = get_context_descriptors(img, block_size) # num_blocks x num_blocks x N_f
-
-    num_blocks = d/block_size
-
-    for col in range(num_blocks):
-        for row in range(num_blocks):
-            c_l = context_descriptors[col, row] # N_f
-
-    
 def measure_contextual_dissimilarity(c_l, c_m):
     '''
         Returns a measure of dissimilarity between two block's contextual descriptors
@@ -102,12 +54,6 @@ def get_context_descriptors(img, block_size, N_f=20):
     
     return context_descriptors
 
-
-def energy_minimization():
-    '''
-        The MRF part of the algorithm
-    '''
-    pass
 
 def get_similar_patch_locations(patch_loc_col, patch_loc_row, context_descriptors, block_size, threshold=50.0):
     '''
@@ -307,9 +253,8 @@ if __name__ == '__main__':
                 pot_col_start, pot_col_end = convert_block_center_to_img_range(pot_col, block_size)
                 pot_row_start, pot_row_end = convert_block_center_to_img_range(pot_row, block_size)
                 img_cpy[pot_col_start:pot_col_end, pot_row_start:pot_row_end] = [0, 0, 255]
+    
+    
     cv2.imshow("patches filled in", final_img)
     cv2.imshow("which patches were filled in", img_cpy)
     cv2.waitKey(0)
-    # Patch selection only done for patches who have altleast a pixel of "target"
-    # Aka, no need to patch select if the given block is already filled
-    # context_aware_patch_selection(img, mask, False)
