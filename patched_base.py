@@ -199,6 +199,29 @@ def get_neighbor_patch_locations(col, row, block_size, num_blocks):
     return neighbors
 
 
+def get_patches_to_fill(mask, block_size):
+    '''
+        Returns a list of patch locations for patches that need to be filled (i.e, at least one pixel missing)
+
+        :param mask: MxM. mask[x,y] = True, means image @ (x,y) needs to be filled
+        :param block_size: dimension of patches
+        :return: list[(col, row)] where col, row are the center locations of patches
+    '''
+    d = mask.shape[0]
+    num_blocks = d//block_size
+    # Locations of blocks that have at least one pixel needing to be filled
+    patch_locations = []
+    for col in range(num_blocks):
+        img_col_start, img_col_end = convert_block_to_img_range(col, block_size)
+        for row in range(num_blocks):
+            img_row_start , img_row_end = convert_block_to_img_range(row, block_size)
+            mask_patch = mask[img_col_start:img_col_end, img_row_start:img_row_end]
+            if np.any(mask_patch):
+                block_col, block_row = convert_block_to_img_center(col, row, block_size)
+                patch_locations.append((block_col, block_row))
+    return patch_locations
+
+
 if __name__ == '__main__':
     test_data = load_data.load_test_data()
     train_data = load_data.load_train_data()
@@ -210,26 +233,21 @@ if __name__ == '__main__':
 
     img_cpy = np.copy(img)
     img_cpy[mask.nonzero()] = 0
+    
     masked_img = np.copy(img_cpy)
     final_img = np.copy(masked_img)
+    
     block_size = 5
     num_blocks = d//block_size
     half_block = block_size//2
+    
+    # Add patch grid lines
     for col in range(1, num_blocks):
         img_col = col*block_size
         img_cpy[img_col, :] = [255, 0, 0]
         img_cpy[:, img_col] = [255, 0, 0]
     
-    # Locations of blocks that have at least one pixel needing to be filled
-    patch_locations = []
-    for col in range(num_blocks):
-        img_col_start, img_col_end = convert_block_to_img_range(col, block_size)
-        for row in range(num_blocks):
-            img_row_start , img_row_end = convert_block_to_img_range(row, block_size)
-            mask_patch = mask[img_col_start:img_col_end, img_row_start:img_row_end]
-            if np.any(mask_patch):
-                block_col, block_row = convert_block_to_img_center(col, row, block_size)
-                patch_locations.append((block_col, block_row))
+    patch_locations = get_patches_to_fill(mask, block_size)
     
     context_descriptors = get_context_descriptors(masked_img, block_size) # num_blocks x num_blocks x N_f
     total_block_size = block_size**2  # How many pixels inside the block
