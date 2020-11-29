@@ -294,8 +294,6 @@ if __name__ == '__main__':
         num_unknown = np.sum(mask_patch)
         if num_unknown / total_block_size < 0.5:
             # reliable
-            continue
-            print("here")
             img_cpy[img_col_start:img_col_end, img_row_start:img_row_end] = [0, 0, 255]
             similar_patches = get_similar_patch_locations(block_col, block_row, context_descriptors, block_size)
             combined = combine_multi_candidate_patches(masked_img, similar_patches, block_size)
@@ -304,17 +302,12 @@ if __name__ == '__main__':
             # Unreliable block
             img_cpy[img_col_start:img_col_end, img_row_start:img_row_end] = [0, 255, 0]
             neighbor_patches = get_neighbor_patch_locations(block_col, block_row, block_size, num_blocks)
-            print(len(neighbor_patches))
             # TODO: Add the outer loop into a method so the following loop can have recursive calls
             for (pot_col, pot_row) in neighbor_patches:
                 pot_col_start, pot_col_end = convert_block_center_to_img_range(pot_col, block_size)
                 pot_row_start, pot_row_end = convert_block_center_to_img_range(pot_row, block_size)
                 img_cpy[pot_col_start:pot_col_end, pot_row_start:pot_row_end] = [0, 0, 255]
-            cv2.imshow("which patches were filled in", img_cpy)
-            cv2.waitKey(0)
-            quit()
-            pass
-    # cv2.imshow("patches filled in", final_img)
+    cv2.imshow("patches filled in", final_img)
     cv2.imshow("which patches were filled in", img_cpy)
     cv2.waitKey(0)
     # Patch selection only done for patches who have altleast a pixel of "target"
