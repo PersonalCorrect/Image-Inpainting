@@ -222,6 +222,34 @@ def get_patches_to_fill(mask, block_size):
     return patch_locations
 
 
+def get_candidate_patches_for_locations(patch_locations, masked_img, mask, block_size, context_descriptors):
+    '''
+        Returns combined candidate patches for each patch location
+        each candidate patch is block_size x block_size x 3
+    '''
+    num_loc = len(patch_locations)
+    candidates = np.zeros((num_loc, block_size, block_size, 3))
+    total_block_size = block_size**2  # How many pixels inside the block
+    for loc_i in range(num_loc):
+        (block_col, block_row) = patch_locations[loc_i]
+        img_col_start, img_col_end = convert_block_center_to_img_range(block_col, block_size)
+        img_row_start, img_row_end = convert_block_center_to_img_range(block_row, block_size)
+        mask_patch = mask[img_col_start:img_col_end, img_row_start:img_row_end]
+        num_unknown = np.sum(mask_patch)
+        if num_unknown / total_block_size < 0.5:
+            # reliable
+            img_cpy[img_col_start:img_col_end, img_row_start:img_row_end] = [0, 0, 255]
+            similar_patches = get_similar_patch_locations(block_col, block_row, context_descriptors, block_size)
+        else:
+            # Unreliable block
+            # TODO: Fix: infinite recursion.. try to implement memoization. save the combined patches so we dont keep recalculating
+            img_cpy[img_col_start:img_col_end, img_row_start:img_row_end] = [0, 255, 0]
+            neighbor_patches = get_neighbor_patch_locations(block_col, block_row, block_size, num_blocks)
+            similar_patches = get_candidate_patches_for_locations(neighbor_patches, masked_img, mask, block_size, context_descriptors)
+        candidates[loc_i] = combine_multi_candidate_patches(masked_img, similar_patches, block_size)
+    return candidates
+
+
 if __name__ == '__main__':
     test_data = load_data.load_test_data()
     train_data = load_data.load_train_data()
@@ -250,28 +278,17 @@ if __name__ == '__main__':
     patch_locations = get_patches_to_fill(mask, block_size)
     
     context_descriptors = get_context_descriptors(masked_img, block_size) # num_blocks x num_blocks x N_f
-    total_block_size = block_size**2  # How many pixels inside the block
-    for (block_col, block_row) in patch_locations:
+    
+    candidate_patches = get_candidate_patches_for_locations(patch_locations, masked_img, mask, block_size, context_descriptors)
+    
+    for loc_i in range(len(patch_locations)):
+        (block_col, block_row) = patch_locations[loc_i]
+        candidate = candidate_patches[loc_i]
         img_col_start, img_col_end = convert_block_center_to_img_range(block_col, block_size)
         img_row_start, img_row_end = convert_block_center_to_img_range(block_row, block_size)
         mask_patch = mask[img_col_start:img_col_end, img_row_start:img_row_end]
-        num_unknown = np.sum(mask_patch)
-        if num_unknown / total_block_size < 0.5:
-            # reliable
-            img_cpy[img_col_start:img_col_end, img_row_start:img_row_end] = [0, 0, 255]
-            similar_patches = get_similar_patch_locations(block_col, block_row, context_descriptors, block_size)
-            combined = combine_multi_candidate_patches(masked_img, similar_patches, block_size)
-            final_img[img_col_start:img_col_end, img_row_start:img_row_end][mask_patch, :] = combined[mask_patch, :]
-        else:
-            # Unreliable block
-            img_cpy[img_col_start:img_col_end, img_row_start:img_row_end] = [0, 255, 0]
-            neighbor_patches = get_neighbor_patch_locations(block_col, block_row, block_size, num_blocks)
-            # TODO: Add the outer loop into a method so the following loop can have recursive calls
-            for (pot_col, pot_row) in neighbor_patches:
-                pot_col_start, pot_col_end = convert_block_center_to_img_range(pot_col, block_size)
-                pot_row_start, pot_row_end = convert_block_center_to_img_range(pot_row, block_size)
-                img_cpy[pot_col_start:pot_col_end, pot_row_start:pot_row_end] = [0, 0, 255]
-    
+        final_img[img_col_start:img_col_end, img_row_start:img_row_end][mask_patch, :] = candidate[mask_patch, :]
+        img_cpy[img_col_start:img_col_end, img_row_start:img_row_end] = [0, 0, 255]
     
     cv2.imshow("patches filled in", final_img)
     cv2.imshow("which patches were filled in", img_cpy)
